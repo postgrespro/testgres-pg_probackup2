@@ -60,6 +60,7 @@ class ProbackupApp:
         self.archive_compress = init_params.archive_compress
         self.test_class.output = None
         self.execution_time = None
+        self.valgrind = init_params.valgrind
         self.valgrind_sup_path = init_params.valgrind_sup_path
 
     def form_daemon_process(self, cmdline, env):
@@ -157,11 +158,8 @@ class ProbackupApp:
     def _form_cmdline(self, binary_path, command):
         cmdline = [binary_path, *command]
 
-        if self.valgrind_sup_path and command[0] != "--version":
+        if (self.valgrind == 'y' or self.valgrind_sup_path) and command[0] != "--version":
             os.makedirs(self.pb_log_path, exist_ok=True)
-            if self.valgrind_sup_path and not os.path.isfile(self.valgrind_sup_path):
-                raise FileNotFoundError(f"PG_PROBACKUP_VALGRIND_SUP should contain path to valgrind suppression file, "
-                                        f"but found: {self.valgrind_sup_path}")
             valgrind_cmd = [
                 "valgrind",
                 "--gen-suppressions=all",
@@ -171,10 +169,18 @@ class ProbackupApp:
                 "--show-leak-kinds=all",
                 "--errors-for-leak-kinds=all",
                 "--error-exitcode=0",
-                f"--log-file={os.path.join(self.pb_log_path, f'valgrind-{command[0]}-%p.log')}",
-                f"--suppressions={self.valgrind_sup_path}",
-                "--"
+                f"--log-file={os.path.join(self.pb_log_path, f'valgrind-{command[0]}-%p.log')}"
             ]
+            if self.valgrind_sup_path:
+                if os.path.isfile(self.valgrind_sup_path):
+                    valgrind_cmd += [f"--suppressions={self.valgrind_sup_path}"]
+                else:
+                    raise FileNotFoundError(f"PG_PROBACKUP_VALGRIND_SUP must be the path to a valgrind suppression file, "
+                                            f"but found: {self.valgrind_sup_path}")
+            else:
+                # Assume the tests are started from the root of pg_probackup repository
+                valgrind_cmd += [f"--suppressions=.valgrind.supp"]
+
             cmdline = valgrind_cmd + cmdline
 
         return cmdline

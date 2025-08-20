@@ -22,6 +22,8 @@ The package requires testgres~=1.9.3.
 | - | - | - | - |
 | PGPROBACKUP_TMP_DIR | No | tests/tmp_dirs | The root of the temporary directory hierarchy where tests store data and logs. Relative paths start from the current working directory. |
 | PG_PROBACKUP_TEST_BACKUP_DIR_PREFIX | No | Temporary test hierarchy | Prefix of the test backup directories. Must be an absolute path. Use this variable to store test backups in a location other than the temporary test hierarchy. |
+| PG_PROBACKUP_VALGRIND | No | Not set | Run pg_probackup through valgrind if the variable is set to 'y'. Setting  PG_PROBACKUP_VALGRIND_SUP (see below) to any value enables valgrind just like setting `PG_PROBACKUP_VALGRIND=y` would do. |
+| PG_PROBACKUP_VALGRIND_SUP | No | Not set | Specify the path to a valgrind suppression file. If the variable is not set then a file named "valgrind.supp" is searched for in the current working directory (normally the root of pg_probackup repository). Setting  PG_PROBACKUP_VALGRIND_SUP to any value enables valgrind just like setting `PG_PROBACKUP_VALGRIND=y` (see above) would do. |
 
 See [Testgres](https://github.com/postgrespro/testgres/tree/master#environment) on how to configure a custom Postgres installation using `PG_CONFIG` and `PG_BIN` environment variables.
 
