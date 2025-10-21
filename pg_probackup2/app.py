@@ -492,10 +492,16 @@ class ProbackupApp:
             if remote_port:
                 cmd_list.append(f'--remote-port={remote_port}')
         if self.verbose:
-            cmd_list += [
-                '--log-level-file=VERBOSE',
-                '--log-directory={0}'.format(destination_node.logs_dir)
-            ]
+            if init_params.major_version > 2:
+                cmd_list += [
+                    '--log-level-file=trace',
+                    '--log-directory={0}'.format(destination_node.logs_dir)
+                ]
+            else:
+                cmd_list += [
+                    '--log-level-file=VERBOSE',
+                    '--log-directory={0}'.format(destination_node.logs_dir)
+                ]
 
         return self.run(cmd_list + options, gdb=gdb, expect_error=expect_error, use_backup_dir=False)
 
