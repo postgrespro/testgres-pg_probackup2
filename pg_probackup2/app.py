@@ -64,7 +64,10 @@ class ProbackupApp:
         self.valgrind_sup_path = init_params.valgrind_sup_path
 
     def form_daemon_process(self, cmdline, env):
-        def stream_output(stream: subprocess.PIPE) -> None:
+        if self.test_class.output is None:
+            self.test_class.output = str()
+
+        def stream_output(stream) -> None:
             try:
                 for line in iter(stream.readline, ''):
                     print(line)
@@ -82,11 +85,11 @@ class ProbackupApp:
         logging.info(f"Process started in background with PID: {self.process.pid}")
 
         if self.process.stdout and self.process.stderr:
-            stdout_thread = threading.Thread(target=stream_output, args=(self.process.stdout,), daemon=True)
-            stderr_thread = threading.Thread(target=stream_output, args=(self.process.stderr,), daemon=True)
+            self.stdout_thread = threading.Thread(target=stream_output, args=(self.process.stdout,), daemon=True)
+            self.stderr_thread = threading.Thread(target=stream_output, args=(self.process.stderr,), daemon=True)
 
-            stdout_thread.start()
-            stderr_thread.start()
+            self.stdout_thread.start()
+            self.stderr_thread.start()
 
         return self.process.pid
 
@@ -195,7 +198,14 @@ class ProbackupApp:
             # Execute command
             start_time = time.time()
             if daemonize:
-                return self.form_daemon_process(cmdline, env)
+                pid = self.form_daemon_process(cmdline, env)
+                if expect_error:
+                    _timeout = 120
+                    if self.stdout_thread:
+                        self.stdout_thread.join(_timeout)
+                    if self.stderr_thread:
+                        self.stderr_thread.join(_timeout)
+                return pid
             else:
                 self.test_class.output = subprocess.check_output(
                     cmdline,
