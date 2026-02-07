@@ -41,15 +41,24 @@ class ProbackupException(Exception):
 fs_backup_class = FSTestBackupDir
 
 
+class _OutputContainer:
+    """Internal container for output and cmd when test_class is not provided"""
+    def __init__(self):
+        self.output = None
+        self.cmd = None
+
+
 class ProbackupApp:
 
-    def __init__(self, test_class: unittest.TestCase,
-                 pg_node, pb_log_path, test_env, auto_compress_alg, backup_dir, probackup_path=None):
+    def __init__(self, test_class: unittest.TestCase = None,
+                 pg_node=None, pb_log_path=None, test_env=None, auto_compress_alg=None,
+                 backup_dir=None, probackup_path=None):
         self.process = None
-        self.test_class = test_class
+        # Use provided test_class or create internal container
+        self.test_class = test_class if test_class is not None else _OutputContainer()
         self.pg_node = pg_node
         self.pb_log_path = pb_log_path
-        self.test_env = test_env
+        self.test_env = test_env if test_env is not None else os.environ.copy()
         self.auto_compress_alg = auto_compress_alg
         self.backup_dir = backup_dir
         self.probackup_path = probackup_path or init_params.probackup_path
