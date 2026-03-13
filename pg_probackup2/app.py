@@ -787,12 +787,21 @@ class ProbackupApp:
             log_level=False, archive_timeout=False,
             custom_archive_command=None):
 
-        # check instance existing
-        instances_json = self.show(instance=None, as_json=True, expect_error=False, as_text=True)
-        instances_data = json.loads(instances_json)
-        if not any(inst_data.get('instance') == instance for inst_data in instances_data):
-            raise RuntimeError("Instance '{0}' does not exist. " \
-                          "Please add the instance first using add_instance() or init_pb_node().".format(instance))
+        known_nodes = getattr(self.pg_node, 'created_nodes', set())
+        try:
+            instances_json = self.show(instance=None, as_json=True, expect_error=False, as_text=True)
+            instances_data = json.loads(instances_json)
+            catalog_has_instance = any(inst_data.get('instance') == instance for inst_data in instances_data)
+        except Exception:
+            instances_data = []
+            catalog_has_instance = False
+
+        if not catalog_has_instance and instance not in known_nodes:
+            raise RuntimeError(
+                "Instance '{0}' does not exist. "
+                "Please add the instance first using add_instance() or init_pb_node()."
+                .format(instance)
+            )
 
         # parse postgresql.auto.conf
         options = {}
