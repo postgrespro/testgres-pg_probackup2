@@ -739,6 +739,21 @@ class ProbackupApp:
         ]
         return self.run(cmd_list + options, old_binary=old_binary, expect_error=expect_error)
 
+    def retention(
+            self, instance, options=None, old_binary=False, gdb=False, expect_error=False):
+        if init_params.major_version < 3:
+            logging.warning("retention command is only available for pg_probackup 3")
+            return None
+        if options is None:
+            options = []
+        cmd_list = [
+            'retention',
+            '--instance={0}'.format(instance),
+        ]
+
+        return self.run(cmd_list + options, old_binary=old_binary, gdb=gdb,
+                        expect_error=expect_error)
+
     def show_config(self, instance, old_binary=False, expect_error=False, gdb=False):
         out_dict = {}
         cmd_list = [
