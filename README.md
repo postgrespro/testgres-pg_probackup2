@@ -1,3 +1,5 @@
+[![PyPI package version](https://badge.fury.io/py/testgres-pg_probackup2.svg)](https://badge.fury.io/py/testgres-pg_probackup2)
+
 # testgres - pg_probackup2
 
 Control and testing utility for [pg_probackup2](https://github.com/postgrespro/pg_probackup). Python 3.5+ is supported.
