@@ -96,8 +96,9 @@ class Init(object):
             if shutil.which(test_env["PGPROBACKUPBIN"]):
                 self.probackup_path = test_env["PGPROBACKUPBIN"]
             else:
-                if self.verbose:
-                    print('PGPROBACKUPBIN is not an executable file')
+                raise Exception(
+                    'pg_probackup binary not found at PGPROBACKUPBIN={0}'.format(
+                        test_env["PGPROBACKUPBIN"]))
 
         if not self.probackup_path:
             probackup_path_tmp = os.path.join(
