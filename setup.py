@@ -14,5 +14,5 @@ setup(
     author='Postgres Professional',
     author_email='testgres@postgrespro.ru',
     keywords=['pg_probackup', 'testing', 'testgres'],
-    install_requires=['testgres>=1.9.2']
+    install_requires=['testgres>=1.9.2', 'zstd', 'lz4']
 )
