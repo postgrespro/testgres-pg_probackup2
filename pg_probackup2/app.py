@@ -14,6 +14,9 @@ import testgres
 from .storage.fs_backup import TestBackupDir, FSTestBackupDir
 from .gdb import GDBobj
 from .init_helpers import init_params
+from .logger import log_command, patch_testgres_command_logging
+
+patch_testgres_command_logging()
 
 warning = """
 Wrong splint in show_pb
@@ -123,8 +126,7 @@ class ProbackupApp:
         command, strcommand = self._add_options(command, skip_log_directory)
 
         self.test_class.cmd = f"{binary_path} {strcommand}"
-        if self.verbose:
-            print(self.test_class.cmd)
+        log_command(self.test_class.cmd)
 
         cmdline = self._form_cmdline(binary_path, command)
 
@@ -773,8 +775,7 @@ class ProbackupApp:
         if not env:
             env = self.test_env
 
-        if self.verbose:
-            print([' '.join(map(str, command))])
+        log_command(command)
         try:
             if asynchronous:
                 return subprocess.Popen(
