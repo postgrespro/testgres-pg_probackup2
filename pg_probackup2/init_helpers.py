@@ -68,19 +68,6 @@ class Init(object):
             [pg_bin, "-C", "server_version"],
             encoding='utf-8').rstrip('develalphabetapre\n')
         parts = [*server_version.split('.'), '0', '0'][:3]
-
-        ldd = subprocess.run(
-            ['ldd', pg_bin],
-            capture_output=True,
-            encoding='utf-8').stdout
-        self.is_lz4_enabled = 'liblz4.so' in ldd
-
-        server_version_out = subprocess.run(
-            [pg_bin, "-C", "server_version"],
-            capture_output=True,
-            encoding='utf-8').stdout
-        server_version = testgres.parse_pg_version(server_version_out)
-        parts = [*server_version.split('.'), '0', '0'][:3]
         parts[0] = re.match(r'\d+', parts[0]).group()
         num_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
         # For backward compatibility
