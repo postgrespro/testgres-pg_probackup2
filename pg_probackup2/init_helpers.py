@@ -48,8 +48,8 @@ class Init(object):
         self.is_pgpro = 'PGPRO_EDITION' in self._pg_config
         self.is_nls_enabled = 'enable-nls' in self._pg_config['CONFIGURE']
         self.is_lz4_enabled = '-llz4' in self._pg_config['LIBS']
-        version = self._pg_config['VERSION'].rstrip('develalphabetapre')
-        parts = [*version.split(' ')[1].split('.'), '0', '0'][:3]
+        version_num = testgres.parse_pg_version(self._pg_config['VERSION'])
+        parts = [*version_num.split('.'), '0', '0'][:3]
         parts[0] = re.match(r'\d+', parts[0]).group()
         self.pg_config_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
 
