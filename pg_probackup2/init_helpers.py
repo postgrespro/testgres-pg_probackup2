@@ -42,6 +42,7 @@ class Init(object):
         else:
             self.verbose = False
 
+<<<<<<< HEAD
         os_ops = testgres.LocalOperations()
 
         pg_bin = os.getenv('PG_BIN', shutil.which('postgres'))
@@ -68,6 +69,16 @@ class Init(object):
             [pg_bin, "-C", "server_version"],
             encoding='utf-8').rstrip('develalphabetapre\n')
         parts = [*server_version.split('.'), '0', '0'][:3]
+=======
+        self._pg_config = testgres.get_pg_config()
+        self.is_enterprise = self._pg_config.get('PGPRO_EDITION', None) == 'enterprise'
+        self.is_shardman = self._pg_config.get('PGPRO_EDITION', None) == 'shardman'
+        self.is_pgpro = 'PGPRO_EDITION' in self._pg_config
+        self.is_nls_enabled = 'enable-nls' in self._pg_config['CONFIGURE']
+        self.is_lz4_enabled = '-llz4' in self._pg_config['LIBS']
+        version_num = testgres.parse_pg_version(self._pg_config['VERSION'])
+        parts = [*version_num.split('.'), '0', '0'][:3]
+>>>>>>> 6d99741 (Fix trial PGPRO version parse (#19))
         parts[0] = re.match(r'\d+', parts[0]).group()
         self.pg_config_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
 
