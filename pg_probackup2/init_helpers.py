@@ -61,14 +61,12 @@ class Init(object):
         self.is_nls_enabled = True
         ldd = os_ops.exec_command(
             ['ldd', pg_bin],
-            encoding='utf-8',
-            ignore_errors=True)
+            encoding='utf-8')
         self.is_lz4_enabled = 'liblz4.so' in ldd
 
         server_version = os_ops.exec_command(
             [pg_bin, "-C", "server_version"],
-            encoding='utf-8',
-            ignore_errors=True).rstrip('develalphabetapre\n')
+            encoding='utf-8').rstrip('develalphabetapre\n')
         parts = [*server_version.split('.'), '0', '0'][:3]
         parts[0] = re.match(r'\d+', parts[0]).group()
         self.pg_config_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
