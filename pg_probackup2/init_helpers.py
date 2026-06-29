@@ -42,14 +42,34 @@ class Init(object):
         else:
             self.verbose = False
 
-        self._pg_config = testgres.get_pg_config()
-        self.is_enterprise = self._pg_config.get('PGPRO_EDITION', None) == 'enterprise'
-        self.is_shardman = self._pg_config.get('PGPRO_EDITION', None) == 'shardman'
-        self.is_pgpro = 'PGPRO_EDITION' in self._pg_config
-        self.is_nls_enabled = 'enable-nls' in self._pg_config['CONFIGURE']
-        self.is_lz4_enabled = '-llz4' in self._pg_config['LIBS']
-        version = self._pg_config['VERSION'].rstrip('develalphabetapre')
-        parts = [*version.split(' ')[1].split('.'), '0', '0'][:3]
+        os_ops = testgres.LocalOperations()
+
+        pg_bin = os.getenv('PG_BIN', shutil.which('postgres'))
+
+        if pg_bin is None:
+            raise Exception(
+                "Failed to determine the Postgres binary. Specify the path to 'postgres' in PG_BIN or put it to the system PATH.")
+
+        pgpro_edition = os_ops.exec_command(
+            [pg_bin, "-C", "pgpro_edition"],
+            encoding='utf-8',
+            ignore_errors=True)[:-1]    # remove the trailing newline
+        self.is_enterprise = pgpro_edition == 'enterprise'
+        self.is_shardman = pgpro_edition == 'shardman'
+        self.is_pgpro = pgpro_edition != ''
+        # TODO: Always test with NLS support and remove this flag
+        self.is_nls_enabled = True
+        ldd = os_ops.exec_command(
+            ['ldd', pg_bin],
+            encoding='utf-8',
+            ignore_errors=True)
+        self.is_lz4_enabled = 'liblz4.so' in ldd
+
+        server_version = os_ops.exec_command(
+            [pg_bin, "-C", "server_version"],
+            encoding='utf-8',
+            ignore_errors=True).rstrip('develalphabetapre\n')
+        parts = [*server_version.split('.'), '0', '0'][:3]
         parts[0] = re.match(r'\d+', parts[0]).group()
         self.pg_config_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
 
@@ -102,7 +122,7 @@ class Init(object):
 
         if not self.probackup_path:
             probackup_path_tmp = os.path.join(
-                testgres.get_pg_config()['BINDIR'], 'pg_probackup')
+                os.path.dirname(pg_bin), 'pg_probackup')
 
             if os.path.isfile(probackup_path_tmp):
                 if not os.access(probackup_path_tmp, os.X_OK):
