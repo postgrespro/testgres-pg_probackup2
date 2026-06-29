@@ -42,31 +42,33 @@ class Init(object):
         else:
             self.verbose = False
 
+        os_ops = testgres.LocalOperations()
+
         pg_bin = os.getenv('PG_BIN', shutil.which('postgres'))
 
         if pg_bin is None:
             raise Exception(
-                "Failed to determine the Postgres binary. Specify the path to 'postgres' in PG_BIN or put it to the system PATH.')
+                "Failed to determine the Postgres binary. Specify the path to 'postgres' in PG_BIN or put it to the system PATH.")
 
-        pgpro_edition = subprocess.run(
+        pgpro_edition = os_ops.exec_command(
             [pg_bin, "-C", "pgpro_edition"],
-            capture_output=True,
-            encoding='utf-8').stdout[:-1]    # remove the trailing newline
+            encoding='utf-8',
+            ignore_errors=True)[:-1]    # remove the trailing newline
         self.is_enterprise = pgpro_edition == 'enterprise'
         self.is_shardman = pgpro_edition == 'shardman'
         self.is_pgpro = pgpro_edition != ''
         # TODO: Always test with NLS support and remove this flag
         self.is_nls_enabled = True
-        ldd = subprocess.run(
+        ldd = os_ops.exec_command(
             ['ldd', pg_bin],
-            capture_output=True,
-            encoding='utf-8').stdout
+            encoding='utf-8',
+            ignore_errors=True)
         self.is_lz4_enabled = 'liblz4.so' in ldd
 
-        server_version = subprocess.run(
+        server_version = os_ops.exec_command(
             [pg_bin, "-C", "server_version"],
-            capture_output=True,
-            encoding='utf-8').stdout.rstrip('develalphabetapre\n')
+            encoding='utf-8',
+            ignore_errors=True).rstrip('develalphabetapre\n')
         parts = [*server_version.split('.'), '0', '0'][:3]
         parts[0] = re.match(r'\d+', parts[0]).group()
         self.pg_config_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
