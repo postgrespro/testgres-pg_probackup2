@@ -44,11 +44,11 @@ class Init(object):
 
         os_ops = testgres.LocalOperations()
 
-        pg_bin = os.getenv('PG_BIN', shutil.which('postgres'))
+        pg_bin = os.getenv('PG_BIN', os.path.dirname(shutil.which('postgres')))
 
         if pg_bin is None:
             raise Exception(
-                "Failed to determine the Postgres binary. Specify the path to 'postgres' in PG_BIN or put it to the system PATH.")
+                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it to the system PATH.")
 
         pgpro_edition = os_ops.exec_command(
             [pg_bin, "-C", "pgpro_edition"],
