@@ -44,16 +44,16 @@ class Init(object):
 
         os_ops = testgres.LocalOperations()
 
-        pg_bin = testgres.get_bin_dir(os_ops)
-        if pg_bin is None:
+        try:
+            pg_bin = testgres.get_bin_dir(os_ops)
+        except Exception as e:
             raise Exception(
-                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it to the system PATH.")
-        postgres = f"{pg_bin}/postgres"
+                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it to the system PATH.") from e
+        postgres = os_ops.build_path(pg_bin, 'postgres')
 
         pgpro_edition = os_ops.exec_command(
             [postgres, "-C", "pgpro_edition"],
-            encoding='utf-8',
-            ignore_errors=True)[:-1]    # remove the trailing newline
+            encoding='utf-8').strip()
         self.is_enterprise = pgpro_edition == 'enterprise'
         self.is_shardman = pgpro_edition == 'shardman'
         self.is_pgpro = pgpro_edition != ''
@@ -125,8 +125,7 @@ class Init(object):
                         test_env["PGPROBACKUPBIN"]))
 
         if not self.probackup_path:
-            probackup_path_tmp = os.path.join(
-                os.path.dirname(pg_bin), 'pg_probackup')
+            probackup_path_tmp = os_ops.build_path(pg_bin, 'pg_probackup')
 
             if os.path.isfile(probackup_path_tmp):
                 if not os.access(probackup_path_tmp, os.X_OK):
