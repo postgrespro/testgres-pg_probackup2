@@ -44,16 +44,16 @@ class Init(object):
 
         os_ops = testgres.LocalOperations()
 
-        try:
-            pg_bin = testgres.get_bin_dir(os_ops)
-        except Exception as e:
+        pg_bin = testgres.get_bin_dir(os_ops)
+        if pg_bin is None:
             raise Exception(
-                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it to the system PATH.") from e
+                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it to the system PATH.")
         postgres = os_ops.build_path(pg_bin, 'postgres')
 
         pgpro_edition = os_ops.exec_command(
             [postgres, "-C", "pgpro_edition"],
-            encoding='utf-8').strip()
+            encoding='utf-8',
+            ignore_errors=True)[:-1]    # remove the trailing newline
         self.is_enterprise = pgpro_edition == 'enterprise'
         self.is_shardman = pgpro_edition == 'shardman'
         self.is_pgpro = pgpro_edition != ''
