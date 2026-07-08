@@ -2,11 +2,13 @@ import logging
 from functools import reduce
 import getpass
 import os
+import pefile
 import re
 import shutil
 import subprocess
 import sys
 import testgres
+from testgres.operations.exceptions import InvalidOperationException
 
 try:
     import lz4.frame  # noqa: F401
@@ -46,14 +48,14 @@ class Init(object):
 
         pg_bin = testgres.get_bin_dir(os_ops)
         if pg_bin is None:
-            raise Exception(
-                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it to the system PATH.")
-        postgres = os_ops.build_path(pg_bin, 'postgres')
+            raise InvalidOperationException(
+                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it into the system PATH.")
+        postgres = os_ops.build_path(pg_bin, 'postgres.exe' if os.name == 'nt' else 'postgres')
 
         pgpro_edition = os_ops.exec_command(
             [postgres, "-C", "pgpro_edition"],
             encoding='utf-8',
-            ignore_errors=True)[:-1]    # remove the trailing newline
+            ignore_errors=True).rstrip()
         self.is_enterprise = pgpro_edition == 'enterprise'
         self.is_shardman = pgpro_edition == 'shardman'
         self.is_pgpro = pgpro_edition != ''
@@ -61,10 +63,24 @@ class Init(object):
         # TODO: Always test with NLS support and remove this flag
         self.is_nls_enabled = True
 
-        ldd = os_ops.exec_command(
-            ['ldd', postgres],
-            encoding='utf-8')
-        self.is_lz4_enabled = 'liblz4.so' in ldd
+        if os.name == 'posix':
+            ldd = os_ops.exec_command(
+                ['ldd', postgres],
+                encoding='utf-8')
+            self.is_lz4_enabled = 'liblz4.so' in ldd
+        elif os.name == 'nt':
+            pe = pefile.PE(postgres, fast_load=True)
+            pe.parse_data_directories(directories=[
+                pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_IMPORT']])
+            self.is_lz4_enabled = False
+            for entry in pe.DIRECTORY_ENTRY_IMPORT:
+                if entry.dll.decode('utf-8') == 'liblz4.dll':
+                    self.is_lz4_enabled = True
+                    break
+        else:
+            # Fall back to trying to determine lz4 support via pg_config
+            pg_config = testgres.get_pg_config()
+            self.is_lz4_enabled = '-llz4' in pg_config['LIBS']
 
         server_version_out = os_ops.exec_command(
             [postgres, "-C", "server_version"],
