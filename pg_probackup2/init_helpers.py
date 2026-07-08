@@ -42,16 +42,40 @@ class Init(object):
         else:
             self.verbose = False
 
-        self._pg_config = testgres.get_pg_config()
-        self.is_enterprise = self._pg_config.get('PGPRO_EDITION', None) == 'enterprise'
-        self.is_shardman = self._pg_config.get('PGPRO_EDITION', None) == 'shardman'
-        self.is_pgpro = 'PGPRO_EDITION' in self._pg_config
-        self.is_nls_enabled = 'enable-nls' in self._pg_config['CONFIGURE']
-        self.is_lz4_enabled = '-llz4' in self._pg_config['LIBS']
-        version_num = testgres.parse_pg_version(self._pg_config['VERSION'])
-        parts = [*version_num.split('.'), '0', '0'][:3]
+        os_ops = testgres.LocalOperations()
+
+        pg_bin = testgres.get_bin_dir(os_ops)
+        if pg_bin is None:
+            raise Exception(
+                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it to the system PATH.")
+        postgres = os_ops.build_path(pg_bin, 'postgres')
+
+        pgpro_edition = os_ops.exec_command(
+            [postgres, "-C", "pgpro_edition"],
+            encoding='utf-8',
+            ignore_errors=True)[:-1]    # remove the trailing newline
+        self.is_enterprise = pgpro_edition == 'enterprise'
+        self.is_shardman = pgpro_edition == 'shardman'
+        self.is_pgpro = pgpro_edition != ''
+
+        # TODO: Always test with NLS support and remove this flag
+        self.is_nls_enabled = True
+
+        ldd = os_ops.exec_command(
+            ['ldd', postgres],
+            encoding='utf-8')
+        self.is_lz4_enabled = 'liblz4.so' in ldd
+
+        server_version_out = os_ops.exec_command(
+            [postgres, "-C", "server_version"],
+            encoding='utf-8')
+        server_version = testgres.parse_pg_version(server_version_out)
+        parts = [*server_version.split('.'), '0', '0'][:3]
         parts[0] = re.match(r'\d+', parts[0]).group()
-        self.pg_config_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
+        # Server_version consists of two fields (x.y) so num_version always ends with 00
+        num_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
+        # For backward compatibility
+        self.pg_config_version = num_version
 
         os.environ['LANGUAGE'] = 'en'   # set default locale language to en. All messages will use this locale
         test_env = os.environ.copy()
@@ -101,8 +125,7 @@ class Init(object):
                         test_env["PGPROBACKUPBIN"]))
 
         if not self.probackup_path:
-            probackup_path_tmp = os.path.join(
-                testgres.get_pg_config()['BINDIR'], 'pg_probackup')
+            probackup_path_tmp = os_ops.build_path(pg_bin, 'pg_probackup')
 
             if os.path.isfile(probackup_path_tmp):
                 if not os.access(probackup_path_tmp, os.X_OK):
@@ -169,7 +192,7 @@ class Init(object):
             self.old_probackup_version = match.group(0) if match else None
 
         self.remote = test_env.get('PGPROBACKUP_SSH_REMOTE', None) == 'ON'
-        self.ptrack = test_env.get('PG_PROBACKUP_PTRACK', None) == 'ON' and self.pg_config_version >= 110000
+        self.ptrack = test_env.get('PG_PROBACKUP_PTRACK', None) == 'ON' and num_version >= 110000
         self.wal_tree_enabled = test_env.get('PG_PROBACKUP_WAL_TREE_ENABLED', None) == 'ON'
 
         self.bckp_source = test_env.get('PG_PROBACKUP_SOURCE', 'pro').lower()
