@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import traceback
 import testgres
 from testgres.operations.exceptions import InvalidOperationException
 
@@ -265,6 +266,7 @@ class Init(object):
 try:
     init_params = Init()
 except Exception as e:
+    traceback.print_exc(file=sys.stderr)
     logging.error(str(e))
     logging.warning("testgres.plugins.probackup2.init_params is set to None.")
     init_params = None
