@@ -9,7 +9,7 @@ import subprocess
 import sys
 import traceback
 import testgres
-from testgres.operations.exceptions import InvalidOperationException
+import typing
 
 try:
     import lz4.frame  # noqa: F401
@@ -38,7 +38,46 @@ except Exception as e:
     logging.warning("Can't configure testgres: {0}".format(e))
 
 
+class InitData_ServerProps:
+    pgpro_edition: typing.Optional[str]
+    num_version: int
+
+    def __init__(
+        self,
+        pgpro_edition: typing.Optional[str],
+        num_version: int,
+    ):
+        assert pgpro_edition is None or type(pgpro_edition) is str
+        assert type(num_version) is int
+        self.pgpro_edition = pgpro_edition
+        self.num_version = num_version
+        return
+
+
+class InitData_BinaryName:
+    pg_config: str
+    postgres: str
+    initdb: str
+
+    def __init__(
+        self,
+        pg_config: str,
+        initdb: str,
+        postgres: str,
+    ):
+        assert type(pg_config) is str
+        assert type(postgres) is str
+        assert type(initdb) is str
+
+        self.pg_config = pg_config
+        self.postgres = postgres
+        self.initdb = initdb
+        return
+
+
 class Init(object):
+    _server_props: InitData_ServerProps
+
     def __init__(self):
         if '-v' in sys.argv or '--verbose' in sys.argv:
             self.verbose = True
@@ -50,20 +89,37 @@ class Init(object):
 
         pg_bin = testgres.get_bin_dir(os_ops)
         if pg_bin is None:
-            raise InvalidOperationException(
-                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it into the system PATH.")
-        postgres = os_ops.build_path(pg_bin, 'postgres.exe' if os_name == 'nt' else 'postgres')
+            raise testgres.InvalidOperationException(
+                "Failed to determine the Postgres binary directory. Specify the path to the directory in PG_BIN or put it into the system PATH.",
+            )
 
-        pgpro_edition = os_ops.exec_command(
-            [postgres, "-C", "pgpro_edition"],
-            encoding='utf-8',
-            ignore_errors=True).rstrip()
-        self.is_enterprise = pgpro_edition == 'enterprise'
-        self.is_shardman = pgpro_edition == 'shardman'
-        self.is_pgpro = pgpro_edition != ''
+        if not os_ops.path_exists(pg_bin):
+            raise testgres.InvalidOperationException(
+                "Path [{}] is not found.".format(pg_bin),
+            )
+
+        pg_config_path = os_ops.build_path(
+            pg_bin,
+            __class__._get_binary_names(os_ops).pg_config,
+        )
+
+        assert type(pg_config_path) is str
+
+        if os_ops.path_exists(pg_config_path):
+            self._server_props = __class__._init__get_server_props__via_pg_config(
+                os_ops,
+                pg_config_path,
+            )
+        else:
+            self._server_props = __class__._init__get_server_props__via_server(
+                os_ops,
+                pg_bin,
+            )
 
         # TODO: Always test with NLS support and remove this flag
         self.is_nls_enabled = True
+
+        postgres = os_ops.build_path(pg_bin, 'postgres.exe' if os_name == 'nt' else 'postgres')
 
         if os_name == 'posix':
             ldd = os_ops.exec_command(
@@ -81,19 +137,11 @@ class Init(object):
                     break
         else:
             # Fall back to trying to determine lz4 support via pg_config
-            pg_config = testgres.get_pg_config(os_ops=os_ops)
-            self.is_lz4_enabled = '-llz4' in pg_config['LIBS']
-
-        server_version_out = os_ops.exec_command(
-            [postgres, "-C", "server_version"],
-            encoding='utf-8')
-        server_version = testgres.parse_pg_version(server_version_out)
-        parts = [*server_version.split('.'), '0', '0'][:3]
-        parts[0] = re.match(r'\d+', parts[0]).group()
-        # Server_version consists of two fields (x.y) so num_version always ends with 00
-        num_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
-        # For backward compatibility
-        self.pg_config_version = num_version
+            pg_config_data = testgres.utils.get_pg_config2(
+                pg_config_path=pg_config_path,
+                os_ops=os_ops,
+            )
+            self.is_lz4_enabled = '-llz4' in pg_config_data['LIBS']
 
         os.environ['LANGUAGE'] = 'en'   # set default locale language to en. All messages will use this locale
         test_env = os.environ.copy()
@@ -210,7 +258,7 @@ class Init(object):
             self.old_probackup_version = match.group(0) if match else None
 
         self.remote = test_env.get('PGPROBACKUP_SSH_REMOTE', None) == 'ON'
-        self.ptrack = test_env.get('PG_PROBACKUP_PTRACK', None) == 'ON' and num_version >= 110000
+        self.ptrack = test_env.get('PG_PROBACKUP_PTRACK', None) == 'ON' and self._server_props.num_version >= 110000
         self.wal_tree_enabled = test_env.get('PG_PROBACKUP_WAL_TREE_ENABLED', None) == 'ON'
 
         self.bckp_source = test_env.get('PG_PROBACKUP_SOURCE', 'pro').lower()
@@ -261,6 +309,151 @@ class Init(object):
 
     def test_env(self):
         return self._test_env.copy()
+
+    @property
+    def is_enterprise(self) -> bool:
+        assert type(self._server_props) is InitData_ServerProps
+        return self._server_props.pgpro_edition == 'enterprise'
+
+    @property
+    def is_shardman(self) -> bool:
+        assert type(self._server_props) is InitData_ServerProps
+        return self._server_props.pgpro_edition == 'shardman'
+
+    @property
+    def is_pgpro(self) -> bool:
+        assert type(self._server_props) is InitData_ServerProps
+        return self._server_props.pgpro_edition is not None
+
+    @property
+    def pg_config_version(self) -> int:
+        assert type(self._server_props) is InitData_ServerProps
+        return self._server_props.num_version
+
+    @staticmethod
+    def _init__get_server_props__via_pg_config(
+        os_ops: testgres.OsOperations,
+        pg_config_path: str,
+    ) -> InitData_ServerProps:
+        assert isinstance(os_ops, testgres.OsOperations)
+        assert type(pg_config_path) is str
+
+        pg_config = testgres.utils.get_pg_config2(
+            pg_config_path=pg_config_path,
+            os_ops=os_ops,
+        )
+        assert type(pg_config) is dict
+
+        pgpro_edition = pg_config.get('PGPRO_EDITION')
+        assert pgpro_edition is None or type(pgpro_edition) is str
+
+        version_str = pg_config.get('VERSION', '')
+        assert type(version_str) is str
+
+        if not version_str:
+            raise RuntimeError("Field 'VERSION' not found in pg_config output")
+
+        version_num = testgres.parse_pg_version(version_str)
+        parts = [*version_num.split('.'), '0', '0'][:3]
+        parts[0] = re.match(r'\d+', parts[0]).group()
+
+        num_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
+        assert type(num_version) is int
+
+        return InitData_ServerProps(
+            pgpro_edition=pgpro_edition,
+            num_version=num_version,
+        )
+
+    @staticmethod
+    def _init__get_server_props__via_server(
+        os_ops: testgres.OsOperations,
+        pg_bin_dir: str,
+    ) -> InitData_ServerProps:
+        assert isinstance(os_ops, testgres.OsOperations)
+        assert type(pg_bin_dir) is str
+
+        tmpdir = os_ops.mkdtemp()
+        assert type(tmpdir) is str
+        assert os_ops.path_exists(tmpdir)
+        assert os_ops.is_abs_path(tmpdir)
+
+        try:
+            initdb = os_ops.build_path(
+                pg_bin_dir,
+                __class__._get_binary_names(os_ops).initdb,
+            )
+
+            os_ops.exec_command(
+                [initdb, "-D", tmpdir],
+                encoding='utf-8',
+            )
+
+            postgres = os_ops.build_path(
+                pg_bin_dir,
+                __class__._get_binary_names(os_ops).postgres,
+            )
+
+            pgpro_edition_out: typing.Optional[str] = None
+            try:
+                exec_r = os_ops.exec_command(
+                    [postgres, "-C", "pgpro_edition", "-D", tmpdir],
+                    encoding='utf-8',
+                )
+                assert type(exec_r) is str
+                pgpro_edition_out = exec_r.strip()
+            except testgres.ExecUtilException as e:
+                assert e.exit_code != 0
+
+                logging.debug("Exception ({}): {}".format(
+                    type(e).__name__,
+                    e,
+                ))
+
+            assert pgpro_edition_out is None or type(pgpro_edition_out) is str
+            pgpro_edition = pgpro_edition_out
+
+            server_version_out = os_ops.exec_command(
+                [postgres, "-C", "server_version", "-D", tmpdir],
+                encoding='utf-8'
+            )
+            assert type(server_version_out) is str
+            server_version = testgres.parse_pg_version(server_version_out)
+            parts = [*server_version.split('.'), '0', '0'][:3]
+            parts[0] = re.match(r'\d+', parts[0]).group()
+            # Server_version consists of two fields (x.y) so num_version always ends with 00
+            pg_config_version = reduce(lambda v, x: v * 100 + int(x), parts, 0)
+        finally:
+            os_ops.rmdirs(tmpdir)
+
+        return InitData_ServerProps(
+            pgpro_edition=pgpro_edition,
+            num_version=pg_config_version,
+        )
+
+    sm_binary_names__win32 = InitData_BinaryName(
+        pg_config="pg_config.exe",
+        initdb="initdb.exe",
+        postgres="postgres.exe",
+    )
+
+    sm_binary_names__linux = InitData_BinaryName(
+        pg_config="pg_config",
+        initdb="initdb",
+        postgres="postgres",
+    )
+
+    @staticmethod
+    def _get_binary_names(
+        os_ops: testgres.OsOperations,
+    ) -> InitData_BinaryName:
+        assert isinstance(os_ops, testgres.OsOperations)
+
+        platform_name = os_ops.get_platform()
+        if platform_name == "win32":
+            return __class__.sm_binary_names__win32
+
+        return __class__.sm_binary_names__linux
 
 
 try:
