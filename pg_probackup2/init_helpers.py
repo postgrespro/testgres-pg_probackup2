@@ -85,7 +85,7 @@ class Init(object):
             self.is_lz4_enabled = '-llz4' in pg_config['LIBS']
 
         server_version_out = os_ops.exec_command(
-            [postgres, "-C", "server_version"],
+            [postgres, "--version"],
             encoding='utf-8')
         server_version = testgres.parse_pg_version(server_version_out)
         parts = [*server_version.split('.'), '0', '0'][:3]
@@ -263,10 +263,32 @@ class Init(object):
         return self._test_env.copy()
 
 
+class InitFailed(object):
+    """
+    Placeholder used when Init() failed. Any attribute access re-raises the
+    original initialization error with a clear message instead of the cryptic
+    "'NoneType' object has no attribute ..." that a plain None would produce.
+    """
+
+    def __init__(self, error):
+        self._error = error
+
+    def __getattr__(self, name):
+        if name == '_error':
+            raise AttributeError(name)
+        raise RuntimeError(
+            "pg_probackup initialization failed, so init_params.{0} cannot be "
+            "used. Fix the initialization error above. Original error: {1}"
+            .format(name, self._error)
+        ) from self._error
+
+
 try:
     init_params = Init()
 except Exception as e:
     traceback.print_exc(file=sys.stderr)
     logging.error(str(e))
-    logging.warning("testgres.plugins.probackup2.init_params is set to None.")
-    init_params = None
+    logging.warning(
+        "testgres.plugins.probackup2.init_params initialization failed; "
+        "accessing it will re-raise the original error.")
+    init_params = InitFailed(e)
