@@ -175,6 +175,18 @@ class GDBobj:
     def signal(self, sig):
         if 'KILL' in sig:
             self.remove_all_breakpoints()
+            # Avoid GDB 15.x SIGABRT: kill inferior directly, not via `signal`.
+            try:
+                pids = subprocess.check_output(
+                    ['pgrep', '-P', str(self.gdb_pid)],
+                    text=True
+                ).strip().split()
+                for pid in pids:
+                    os.kill(int(pid), 9)
+            except (subprocess.CalledProcessError, ValueError):
+                pass
+            self.kill()
+            return
         self._execute(f'signal {sig}')
 
     def continue_execution_until_exit(self):
@@ -195,6 +207,8 @@ class GDBobj:
         )
 
     def continue_execution_until_error(self):
+        if self._did_quit:
+            return
         self.remove_all_breakpoints()
         result = self._execute('continue', False)
 
@@ -253,6 +267,8 @@ class GDBobj:
 
     # use for breakpoint, run, continue
     def _execute(self, cmd, running=True):
+        if self._did_quit:
+            return []
         output = []
         self.proc.stdin.flush()
         self.proc.stdin.write(cmd + '\n')
