@@ -189,7 +189,7 @@ class GDBobj:
                 ).strip().split()
                 for pid in pids:
                     os.kill(int(pid), 9)
-            except (subprocess.CalledProcessError, ValueError):
+            except (subprocess.CalledProcessError, ValueError, OSError):
                 pass
             self.kill()
             return
