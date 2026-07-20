@@ -134,6 +134,8 @@ class GDBobj:
         )
 
     def remove_all_breakpoints(self):
+        if self._did_quit:
+            return
         if not self.has_breakpoint:
             return
 
@@ -149,6 +151,8 @@ class GDBobj:
         )
 
     def run_until_break(self):
+        if self._did_quit:
+            return
         result = self._execute('run', False)
         for line in result:
             if line.startswith('*stopped,reason="breakpoint-hit"'):
@@ -158,6 +162,8 @@ class GDBobj:
         )
 
     def continue_execution_until_running(self):
+        if self._did_quit:
+            return
         result = self._execute('continue')
 
         for line in result:
@@ -190,6 +196,8 @@ class GDBobj:
         self._execute(f'signal {sig}')
 
     def continue_execution_until_exit(self):
+        if self._did_quit:
+            return
         self.remove_all_breakpoints()
         result = self._execute('continue', False)
 
@@ -225,6 +233,8 @@ class GDBobj:
             'Failed to continue execution until error.\n')
 
     def continue_execution_until_break(self, ignore_count=0):
+        if self._did_quit:
+            return
         if ignore_count > 0:
             result = self._execute(
                 'continue ' + str(ignore_count),
