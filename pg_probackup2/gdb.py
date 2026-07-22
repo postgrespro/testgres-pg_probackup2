@@ -134,6 +134,8 @@ class GDBobj:
         )
 
     def remove_all_breakpoints(self):
+        if self._did_quit:
+            return
         if not self.has_breakpoint:
             return
 
@@ -149,6 +151,8 @@ class GDBobj:
         )
 
     def run_until_break(self):
+        if self._did_quit:
+            return
         result = self._execute('run', False)
         for line in result:
             if line.startswith('*stopped,reason="breakpoint-hit"'):
@@ -158,6 +162,8 @@ class GDBobj:
         )
 
     def continue_execution_until_running(self):
+        if self._did_quit:
+            return
         result = self._execute('continue')
 
         for line in result:
@@ -175,9 +181,23 @@ class GDBobj:
     def signal(self, sig):
         if 'KILL' in sig:
             self.remove_all_breakpoints()
+            # Avoid GDB 15.x SIGABRT: kill inferior directly, not via `signal`.
+            try:
+                pids = subprocess.check_output(
+                    ['pgrep', '-P', str(self.gdb_pid)],
+                    text=True
+                ).strip().split()
+                for pid in pids:
+                    os.kill(int(pid), 9)
+            except (subprocess.CalledProcessError, ValueError, OSError):
+                pass
+            self.kill()
+            return
         self._execute(f'signal {sig}')
 
     def continue_execution_until_exit(self):
+        if self._did_quit:
+            return
         self.remove_all_breakpoints()
         result = self._execute('continue', False)
 
@@ -195,6 +215,8 @@ class GDBobj:
         )
 
     def continue_execution_until_error(self):
+        if self._did_quit:
+            return
         self.remove_all_breakpoints()
         result = self._execute('continue', False)
 
@@ -211,6 +233,8 @@ class GDBobj:
             'Failed to continue execution until error.\n')
 
     def continue_execution_until_break(self, ignore_count=0):
+        if self._did_quit:
+            return
         if ignore_count > 0:
             result = self._execute(
                 'continue ' + str(ignore_count),
@@ -253,6 +277,8 @@ class GDBobj:
 
     # use for breakpoint, run, continue
     def _execute(self, cmd, running=True):
+        if self._did_quit:
+            return []
         output = []
         self.proc.stdin.flush()
         self.proc.stdin.write(cmd + '\n')
