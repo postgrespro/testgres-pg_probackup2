@@ -211,7 +211,7 @@ class Init(object):
                     self.probackup_path = probackup_path_tmp
 
         if not self.probackup_path:
-            raise Exception('pg_probackup binary is not found')
+            raise Exception('pg_probackup binary is not found, add it to PATH or point PGPROBACKUPBIN')
 
         if os_name == 'posix':
             self.EXTERNAL_DIRECTORY_DELIMITER = ':'
