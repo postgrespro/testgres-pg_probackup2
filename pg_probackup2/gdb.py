@@ -5,6 +5,8 @@ import sys
 import unittest
 from time import sleep
 
+from .logger import log_command
+
 
 class GdbException(Exception):
     def __init__(self, message="False"):
@@ -56,8 +58,7 @@ class GDBobj:
         else:
             self.cmd = self.base_cmd + ['--args'] + cmd
 
-        if self.verbose:
-            print([' '.join(map(str, self.cmd))])
+        log_command(self.cmd)
 
         self.proc = subprocess.Popen(
             self.cmd,
