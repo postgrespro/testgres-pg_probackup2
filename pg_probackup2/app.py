@@ -126,7 +126,7 @@ class ProbackupApp:
         if self.verbose:
             print(self.test_class.cmd)
 
-        cmdline = self._form_cmdline(binary_path, command)
+        cmdline = self._form_cmdline(binary_path, command, use_valgrind=gdb is False)
 
         if gdb is True:
             # general test flow for using GDBObj
@@ -168,35 +168,37 @@ class ProbackupApp:
 
         return command, strcommand
 
-    def _form_cmdline(self, binary_path, command):
+    def _form_cmdline(self, binary_path, command, use_valgrind=True):
         cmdline = [binary_path, *command]
 
-        if (self.valgrind == 'y' or self.valgrind_sup_path) and command[0] != "--version":
-            os.makedirs(self.pb_log_path, exist_ok=True)
-            valgrind_cmd = [
-                "valgrind",
-                "--gen-suppressions=all",
-                "--leak-check=full",
-                "--show-reachable=yes",
-                "--error-limit=no",
-                "--show-leak-kinds=all",
-                "--errors-for-leak-kinds=all",
-                "--error-exitcode=0",
-                f"--log-file={os.path.join(self.pb_log_path, f'valgrind-{command[0]}-%p.log')}"
-            ]
-            if self.valgrind_sup_path:
-                if os.path.isfile(self.valgrind_sup_path):
-                    valgrind_cmd += [f"--suppressions={self.valgrind_sup_path}"]
-                else:
-                    raise FileNotFoundError(f"PG_PROBACKUP_VALGRIND_SUP must be the path to a valgrind suppression file, "
-                                            f"but found: {self.valgrind_sup_path}")
+        if not use_valgrind or command[0] == "--version":
+            return cmdline
+        if self.valgrind != 'y' and not self.valgrind_sup_path:
+            return cmdline
+
+        os.makedirs(self.pb_log_path, exist_ok=True)
+        valgrind_cmd = [
+            "valgrind",
+            "--gen-suppressions=all",
+            "--leak-check=full",
+            "--show-reachable=yes",
+            "--error-limit=no",
+            "--show-leak-kinds=all",
+            "--errors-for-leak-kinds=all",
+            "--error-exitcode=0",
+            f"--log-file={os.path.join(self.pb_log_path, f'valgrind-{command[0]}-%p.log')}"
+        ]
+        if self.valgrind_sup_path:
+            if os.path.isfile(self.valgrind_sup_path):
+                valgrind_cmd += [f"--suppressions={self.valgrind_sup_path}"]
             else:
-                # Assume the tests are started from the root of pg_probackup repository
-                valgrind_cmd += [f"--suppressions=.valgrind.supp"]
+                raise FileNotFoundError(f"PG_PROBACKUP_VALGRIND_SUP must be the path to a valgrind suppression file, "
+                                        f"but found: {self.valgrind_sup_path}")
+        else:
+            # Assume the tests are started from the root of pg_probackup repository
+            valgrind_cmd += [f"--suppressions=.valgrind.supp"]
 
-            cmdline = valgrind_cmd + cmdline
-
-        return cmdline
+        return valgrind_cmd + cmdline
 
     def _execute_command(self, cmdline, env, command, gdb, expect_error, return_id, daemonize):
         try:
