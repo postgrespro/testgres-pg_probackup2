@@ -102,3 +102,20 @@ class TestBasic(ProbackupTest):
 
             # Check if the backup is valid
             assert f"INFO: Backup {backup_id} is valid" in out
+
+
+def test_form_cmdline_respects_use_valgrind(tmp_path):
+    app = ProbackupApp.__new__(ProbackupApp)
+    app.valgrind = 'y'
+    app.valgrind_sup_path = None
+    app.pb_log_path = str(tmp_path)
+
+    binary = '/bin/true'
+    command = ['backup', '--instance=node']
+
+    wrapped = app._form_cmdline(binary, command)
+    plain = app._form_cmdline(binary, command, use_valgrind=False)
+
+    assert wrapped[0] == 'valgrind'
+    assert binary in wrapped
+    assert plain == [binary, *command]
