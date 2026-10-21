@@ -196,7 +196,7 @@ class ProbackupApp:
                                         f"but found: {self.valgrind_sup_path}")
         else:
             # Assume the tests are started from the root of pg_probackup repository
-            valgrind_cmd += [f"--suppressions=.valgrind.supp"]
+            valgrind_cmd += ["--suppressions=.valgrind.supp"]
 
         return valgrind_cmd + cmdline
 
