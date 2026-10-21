@@ -2,6 +2,9 @@
 
 set -eux
 
+echo "HOME DIR IS [`realpath ~/`]"
+echo "WORK DIR IS [$(pwd)]"
+
 # Filter tests for local execution (without remote/ssh)
 if [ -z ${TEST_FILTER+x} ]; then
     export TEST_FILTER=""
@@ -116,6 +119,9 @@ fs_verification() {
 fs_verification
 
 # run tests (PATH)
+echo "HOME DIR IS [`realpath ~/`]"
+echo "WORK DIR IS [$(pwd)]"
+
 time coverage run -a -m pytest -l -vvv -n 4 -k "${TEST_FILTER}"
 
 # ---------------------------------------- finish
