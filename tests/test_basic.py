@@ -3,14 +3,15 @@ from __future__ import annotations
 import os
 import shutil
 import pytest
+import unittest
 
 import testgres
-from ...pg_probackup2.app import ProbackupApp
-from ...pg_probackup2.init_helpers import Init, init_params
-from ..storage.fs_backup import FSTestBackupDir
+from pg_probackup2.app import ProbackupApp
+from pg_probackup2.init_helpers import Init, init_params
+from pg_probackup2.storage.fs_backup import FSTestBackupDir
 
 
-class ProbackupTest:
+class ProbackupTest(unittest.TestCase):
     pg_node: testgres.NodeApp
 
     @staticmethod
@@ -39,6 +40,7 @@ class ProbackupTest:
         self.helper__setup_test_paths()
         self.helper__setup_backup_dir()
         self.helper__setup_probackup()
+        return
 
     def helper__setup_test_environment(self, request: pytest.FixtureRequest):
         assert isinstance(request, pytest.FixtureRequest)
@@ -48,6 +50,7 @@ class ProbackupTest:
         self.nodes_to_cleanup = []
         self.module_name, self.fname = request.node.cls.__name__, request.node.name
         self.test_env = Init().test_env()
+        return
 
     def helper__setup_test_paths(self):
         self.rel_path = os.path.join(self.module_name, self.fname)
@@ -58,21 +61,33 @@ class ProbackupTest:
     def helper__setup_backup_dir(self):
         self.backup_dir = self.helper__build_backup_dir('backup')
         self.backup_dir.cleanup()
+        return
 
     def helper__setup_probackup(self):
         self.pg_node = testgres.NodeApp(self.test_path, self.nodes_to_cleanup)
-        self.pb = ProbackupApp(self, self.pg_node, self.pb_log_path, self.test_env,
-                               auto_compress_alg='zlib', backup_dir=self.backup_dir)
+        self.pb = ProbackupApp(
+            self,
+            self.pg_node,
+            self.pb_log_path,
+            self.test_env,
+            auto_compress_alg='zlib',
+            backup_dir=self.backup_dir,
+        )
+        return
 
     def helper__tearDown(self):
         if os.path.exists(self.test_path):
             shutil.rmtree(self.test_path)
+        return
 
     def helper__build_backup_dir(self, backup='backup'):
         return FSTestBackupDir(rel_path=self.rel_path, backup=backup)
 
 
-@pytest.mark.skipif(not ProbackupTest.probackup_is_available(), reason="Check that PGPROBACKUPBIN is defined and is valid.")
+@pytest.mark.skipif(
+    not ProbackupTest.probackup_is_available(),
+    reason="Check that PGPROBACKUPBIN is defined and is valid.",
+)
 class TestBasic(ProbackupTest):
     def test_full_backup(self):
         assert self.pg_node is not None
@@ -81,7 +96,10 @@ class TestBasic(ProbackupTest):
         assert type(self.pb) == ProbackupApp  # noqa: E721
 
         # Setting up a simple test node
-        node = self.pg_node.make_simple('node', pg_options={"fsync": "off", "synchronous_commit": "off"})
+        node = self.pg_node.make_simple(
+            'node',
+            pg_options={"fsync": "off", "synchronous_commit": "off"},
+        )
 
         assert node is not None
         assert type(node) == testgres.PostgresNode  # noqa: E721
@@ -99,9 +117,11 @@ class TestBasic(ProbackupTest):
             # Perform backup and validation
             backup_id = self.pb.backup_node('node', node)
             out = self.pb.validate('node', backup_id)
+            assert type(out) is str
 
             # Check if the backup is valid
             assert f"INFO: Backup {backup_id} is valid" in out
+            return
 
 
 def test_form_cmdline_respects_use_valgrind(tmp_path):
@@ -119,3 +139,4 @@ def test_form_cmdline_respects_use_valgrind(tmp_path):
     assert wrapped[0] == 'valgrind'
     assert binary in wrapped
     assert plain == [binary, *command]
+    return
