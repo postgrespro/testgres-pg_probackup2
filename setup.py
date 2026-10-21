@@ -8,7 +8,7 @@ setup(
     name='testgres_pg_probackup2',
     packages=['pg_probackup2', 'pg_probackup2.storage'],
     description='Plugin for testgres that manages pg_probackup2',
-    url='https://github.com/postgrespro/testgres',
+    url='https://github.com/postgrespro/testgres-pg_probackup2',
     long_description_content_type='text/markdown',
     license='PostgreSQL',
     author='Postgres Professional',
