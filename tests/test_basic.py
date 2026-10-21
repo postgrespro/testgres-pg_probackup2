@@ -6,9 +6,9 @@ import pytest
 import unittest
 
 import testgres
-from pg_probackup2.app import ProbackupApp
-from pg_probackup2.init_helpers import Init, init_params
-from pg_probackup2.storage.fs_backup import FSTestBackupDir
+from src.app import ProbackupApp
+from src.init_helpers import Init, init_params
+from src.storage.fs_backup import FSTestBackupDir
 
 
 class ProbackupTest(unittest.TestCase):

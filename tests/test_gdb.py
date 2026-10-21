@@ -1,7 +1,7 @@
 import pytest
 from unittest import mock
 
-from pg_probackup2 import gdb
+from src import gdb
 
 
 def test_needs_gdb_decorator_behavior():
