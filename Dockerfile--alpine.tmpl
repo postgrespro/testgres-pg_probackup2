@@ -42,9 +42,10 @@ RUN apk add --no-cache \
     linux-headers
 
 # --------------------------------------------- postgres
-FROM base1_with_dev_tools AS base1_with_pg-17
+FROM base1_with_dev_tools AS base2a_with_pg
+ARG PG_VERSION
 
-RUN git clone https://github.com/postgres/postgres.git -b REL_17_STABLE /pgpro/postgres/source
+RUN git clone https://github.com/postgres/postgres.git -b REL_${PG_VERSION}_STABLE /pgpro/postgres/source
 
 WORKDIR /pgpro/postgres/source
 
@@ -60,10 +61,25 @@ RUN ln -s /pgpro/postgres/install/bin/pg_config -t /usr/local/bin
 
 # SETUP PG CLIENT LIBRARY
 # libpq.so.5 is enough
-# RUN ln -s /pgpro/postgres/install/lib/libpq.so.5.17 /usr/lib64/libpq.so.5
+# RUN ln -s /pgpro/postgres/install/lib/libpq.so.5.${PG_VERSION} /usr/lib64/libpq.so.5
+
+# --------------------------------------------- postgres 14
+FROM base2a_with_pg AS base2_with_pg-14
+
+# --------------------------------------------- postgres 15
+FROM base2a_with_pg AS base2_with_pg-15
+
+# --------------------------------------------- postgres 16
+FROM base2a_with_pg AS base2_with_pg-16
+
+# --------------------------------------------- postgres 17
+FROM base2a_with_pg AS base2_with_pg-17
+
+# --------------------------------------------- postgres 18
+FROM base2a_with_pg AS base2_with_pg-18
 
 # --------------------------------------------- base4-pbk
-FROM base1_with_pg-${PG_VERSION} AS base4-pbk
+FROM base2_with_pg-${PG_VERSION} AS base4-pbk
 
 RUN git clone https://github.com/postgrespro/pg_probackup.git /pgpro/pbk2/source
 
