@@ -122,10 +122,13 @@ jobs:
             python: "3.12"
             postgres: "16"
             case_suffix: "py3_12_xx-pg16_xx"
-          - platform: "alpine"
-            python: "3.12"
-            postgres: "18"
-            case_suffix: "py3_12_xx-pg18_xx"
+#
+#           11.06 /usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/../../../../x86_64-alpine-linux-musl/bin/ld: src/pg_crc.o: in function `crc32_bytea':
+#           11.06 pg_crc.c:(.text+0x9): undefined reference to `pg_detoast_datum_packed'
+#          - platform: "alpine"
+#            python: "3.12"
+#            postgres: "18"
+#            case_suffix: "py3_12_xx-pg18_xx"
 
     name: "test: ${{ matrix.platform }} | ${{ matrix.case_suffix }}"
 
