@@ -1,0 +1,144 @@
+ARG PG_VERSION=17
+ARG PYTHON_VERSION=3.12
+
+# --------------------------------------------- base1
+FROM python:${PYTHON_VERSION}-alpine AS base1
+
+RUN apk add --no-cache \
+    coreutils \
+    bash \
+    mc \
+    procps \
+    openssh \
+    sshpass \
+    sudo \
+    git \
+    curl
+
+RUN sed -i 's/#MaxStartups 10:30:100/MaxStartups 2000:30:2000/' /etc/ssh/sshd_config && \
+    sed -i 's/#MaxSessions 10/MaxSessions 500/' /etc/ssh/sshd_config && \
+    sed -i 's/#MaxAuthTries 6/MaxAuthTries 20/' /etc/ssh/sshd_config
+
+ENV PYTHON_BINARY=python3
+
+# --------------------------------------------- postgres
+FROM base1 AS base1_with_dev_tools
+
+RUN apk add --no-cache \
+    gcc \
+    make \
+    meson \
+    flex \
+    bison \
+    perl \
+    pkgconfig \
+    openssl-dev \
+    icu-dev \
+    zstd-dev \
+    zlib-dev \
+    lz4-dev \
+    libxml2-dev \
+    musl-dev \
+    linux-headers
+
+# --------------------------------------------- postgres
+FROM base1_with_dev_tools AS base1_with_pg-17
+
+RUN git clone https://github.com/postgres/postgres.git -b REL_17_STABLE /pgpro/postgres/source
+
+WORKDIR /pgpro/postgres/source
+
+RUN ./configure --prefix=/pgpro/postgres/install --with-zlib --with-openssl --without-readline --with-lz4 --with-zstd --with-libxml
+RUN make -j 4 install
+RUN make -j 4 -C contrib install
+
+# SETUP PG_CONFIG
+ENV PG_CONFIG="/pgpro/postgres/install/bin/pg_config"
+
+# When pg_config symlink in /usr/local/bin it returns a real (right) result of --bindir
+RUN ln -s /pgpro/postgres/install/bin/pg_config -t /usr/local/bin
+
+# SETUP PG CLIENT LIBRARY
+# libpq.so.5 is enough
+# RUN ln -s /pgpro/postgres/install/lib/libpq.so.5.17 /usr/lib64/libpq.so.5
+
+# --------------------------------------------- base4-pbk
+FROM base1_with_pg-${PG_VERSION} AS base4-pbk
+
+RUN git clone https://github.com/postgrespro/pg_probackup.git /pgpro/pbk2/source
+
+WORKDIR /pgpro/pbk2/source
+
+RUN top_srcdir=/pgpro/postgres/source/ CFLAGS='-g3 -O0' make USE_PGXS=1
+
+ENV PGPROBACKUPSRC="/pgpro/pbk2/source"
+ENV PGPROBACKUPBIN="/pgpro/pbk2/source/pg_probackup"
+
+# --------------------------------------------- final
+FROM base4-pbk AS final
+
+EXPOSE 22
+RUN ssh-keygen -A
+
+RUN adduser -D test && addgroup -S sudo && adduser test sudo
+
+# It allows to use sudo without password
+RUN echo "test ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# THIS CMD IS NEEDED TO CONNECT THROUGH SSH WITHOUT PASSWORD
+RUN echo "test:*" | chpasswd -e
+
+COPY --chown=test:test . /home/test/work
+WORKDIR /home/test/work
+
+RUN chown -R test /pgpro/pbk2/source
+
+ENV LANG=C.UTF-8
+
+RUN chmod 700 /home/test/ && \
+    mkdir -p /home/test/.ssh && \
+    echo 'Host *' > /home/test/.ssh/config && \
+    echo '    ControlMaster auto' >> /home/test/.ssh/config && \
+    echo '    ControlPath /home/test/.ssh/master-%r@%h:%p' >> /home/test/.ssh/config && \
+    echo '    ControlPersist 30m' >> /home/test/.ssh/config && \
+    echo '    StrictHostKeyChecking no' >> /home/test/.ssh/config && \
+    echo '    UserKnownHostsFile /dev/null' >> /home/test/.ssh/config && \
+    # echo '    GSSAPIAuthentication no' >> /home/test/.ssh/config && \
+    chown -R test:test /home/test/.ssh && \
+    chmod 700 /home/test/.ssh && \
+    chmod 600 /home/test/.ssh/config
+
+#
+# \"$@\"
+#   - quote is important!
+#   - "DUMMY-DUMMY-DUMMY" will be ignored. Do not ask me "why?". AXEZ.
+#
+ENTRYPOINT ["sh", "-c", " \
+    set -eux; \
+    echo 'SYSTEM START: PREPARING SSH'; \
+    /usr/sbin/sshd; \
+    ls -la /home/test/.ssh/; \
+    \"$@\" \
+", "DUMMY-DUMMY-DUMMY"]
+
+# Run tests by default (master machine role)
+CMD ["bash", "-c",  " \
+set -eux; \
+echo \"HOME DIR IS [`realpath ~/`]\"; \
+echo \"WORK DIR IS [$(pwd)]\"; \
+if [ ! -f /home/test/.ssh/id_rsa ]; then \
+    su test -c \"ssh-keygen -t rsa -f /home/test/.ssh/id_rsa -q -N ''\"; \
+    su test -c \"cat /home/test/.ssh/id_rsa.pub >> /home/test/.ssh/authorized_keys\"; \
+    chmod 600 /home/test/.ssh/authorized_keys; \
+fi; \
+ls -la /home/test/.ssh/; \
+if [ -n \"${TEST_CFG__REMOTE_SSH_KEY:-}\" ]; then \
+    cp \"${TEST_CFG__REMOTE_SSH_KEY}\" \"${TEST_CFG__REMOTE_SSH_KEY}_ci\"; \
+    export TEST_CFG__REMOTE_SSH_KEY=\"${TEST_CFG__REMOTE_SSH_KEY}_ci\"; \
+    chown test:test \"${TEST_CFG__REMOTE_SSH_KEY}\"; \
+    chmod 600 \"${TEST_CFG__REMOTE_SSH_KEY}\"; \
+    ls -la /home/test/.ssh/; \
+fi; \
+ls -la ./; \
+su test -c \"TEST_FILTER='' bash ./run_tests_own.sh\"; \
+"]
