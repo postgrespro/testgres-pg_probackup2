@@ -346,9 +346,9 @@ def needs_gdb(func):
     check = _check_gdb_flag_or_skip_test()
     if not check:
         @functools.wraps(func)
-        def ok_wrapped(self):
+        def ok_wrapped(self, *args, **kwargs):
             self._gdb_decorated = True
-            func(self)
+            return func(self, *args, **kwargs)
 
         return ok_wrapped
     reason = check[1]
@@ -356,7 +356,7 @@ def needs_gdb(func):
         return unittest.skip(reason)(func)
     elif check[0] == "fail":
         @functools.wraps(func)
-        def fail_wrapper(self):
+        def fail_wrapper(self, *args, **kwargs):
             self.fail(reason)
 
         return fail_wrapper
