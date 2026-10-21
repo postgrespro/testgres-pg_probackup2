@@ -354,14 +354,15 @@ def needs_gdb(func):
     reason = check[1]
     if check[0] == "skip":
         return unittest.skip(reason)(func)
-    elif check[0] == "fail":
+
+    if check[0] == "fail":
         @functools.wraps(func)
         def fail_wrapper(self, *args, **kwargs):
             self.fail(reason)
 
         return fail_wrapper
-    else:
-        raise "Wrong action {0}".format(check)
+
+    raise RuntimeError("Wrong action {0}".format(check))
 
 
 _set_gdb(GDBobj)
