@@ -1,0 +1,6 @@
+pytest
+pytest-xdist
+testgres>=1.17,<1.18
+pefile
+lz4
+zstd
