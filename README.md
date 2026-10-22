@@ -2,7 +2,7 @@
 
 # testgres - pg_probackup2
 
-Control and testing utility for [pg_probackup2](https://github.com/postgrespro/pg_probackup). Python 3.5+ is supported.
+Control and testing utility for [pg_probackup2](https://github.com/postgrespro/pg_probackup). Python 3.7+ is supported.
 
 
 ## Installation
@@ -14,7 +14,7 @@ pip install testgres-pg_probackup
 ```
 
 We encourage you to use `virtualenv` for your testing environment.
-The package requires testgres~=1.9.3.
+The package requires testgres.
 
 ## Usage
 
