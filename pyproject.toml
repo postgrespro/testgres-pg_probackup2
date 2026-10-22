@@ -53,7 +53,7 @@ classifiers = [
 dependencies = [
     "lz4",
     "pefile",
-    "testgres>=1.14.4",
+    "testgres>=1.14.4,<1.18",
     "zstd",
 ]
 
