@@ -1,4 +1,6 @@
+[![CI Status](https://img.shields.io/github/actions/workflow/status/postgrespro/testgres-pg_probackup2/.github/workflows/ci.yml?label=CI)](https://github.com/postgrespro/testgres-pg_probackup2/actions/workflows/ci.yml)
 [![PyPI package version](https://badge.fury.io/py/testgres-pg_probackup2.svg)](https://badge.fury.io/py/testgres-pg_probackup2)
+[![PyPI python versions](https://img.shields.io/pypi/pyversions/testgres-pg_probackup2)](https://pypi.org/project/testgres-pg_probackup2)
 
 # testgres-pg_probackup2
 
