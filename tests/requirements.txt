@@ -1,6 +1,6 @@
 pytest
 pytest-xdist
-testgres>=1.17,<1.18
+testgres>=1.18,<1.19
 pefile
 lz4
 zstd
