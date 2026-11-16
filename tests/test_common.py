@@ -10,7 +10,7 @@ class TestCommon:
         v = Version(pg_probackup2_version)
 
         assert v.major == 0
-        assert v.minor == 10
+        assert v.minor == 11
         assert v.micro == 0
 
         assert str(v) == pg_probackup2_version
